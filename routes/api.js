@@ -60,5 +60,53 @@ router.get('/exercises', (req, res, next) => {
   Exercises.find({}, (error, data) => {res.json(data)})
 });
 
+// full exercise log of any user by getting /api/exercise/log with a parameter of userId(_id). 
+router.get('/log', (req, res, next) => {
+  let userId = req.query.userId;
+  const from = new Date(req.query.from)
+  const to = new Date(req.query.to)
+  
+  Users.findById(userId, (error, user) => {
+    if(error) throw error;
+    if(!user) {
+      return next({
+        status:400, 
+        message: 'No matching userId on record.'
+      })
+    };
+    Exercises.find({
+      userId: userId,
+        date: {
+          // 'less than' for the format of date
+          $lt: to != 'Invalid Date' ? to.getTime() : Date.now() ,
+          // 'greater than' for the format of date
+          $gt: from != 'Invalid Date' ? from.getTime() : 0
+        }
+      }, {
+        __v: 0, //set v and _id to zero
+        _id: 0
+      })
+    .sort('-date') //Sorting the results by date
+    .limit(parseInt(req.query.limit)) // make limit into integer and set that as the limit
+    .exec((error, exercises) => {
+      if (error) throw error;
+      const output = { // formatting of output object
+          _id: userId,
+          username: user.username,
+          from : from != 'Invalid Date' ? from.toDateString() : undefined,
+          to : to != 'Invalid Date' ? to.toDateString(): undefined,
+          count: exercises.length,
+          log: exercises.map(item => ({
+            description : item.description,
+            duration : item.duration,
+            date: item.date.toDateString()
+          })
+        )
+      }
+      res.json(output); //return json output
+    });
+  })
+});
+
 //Export it so that our main module can use this 
 module.exports = router;
